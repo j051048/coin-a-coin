@@ -70,7 +70,7 @@ const App: React.FC = () => {
     
     // Give more powerups for level 2
     if (startLevel === 2) {
-      setPowerUps({ undo: 2, remove: 2, shuffle: 2 });
+      setPowerUps({ undo: 1, remove: 1, shuffle: 1 });
     } else {
       setPowerUps({ undo: 0, remove: 0, shuffle: 0 }); // Tutorial is too easy for tools
     }
