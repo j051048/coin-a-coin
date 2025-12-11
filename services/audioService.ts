@@ -136,7 +136,7 @@ class AudioService {
     const playPromise = this.bgmAudio.play();
     
     if (playPromise !== undefined) {
-      playPromise.catch(error => {
+      playPromise.catch(() => {
         // Fallback to procedural
         if (this.ctx && !this.timerID) {
           this.nextNoteTime = this.ctx.currentTime + 0.1;
