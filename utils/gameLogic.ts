@@ -62,11 +62,12 @@ export const generateLevel = (level: number): TileData[] => {
   
   // DIFFICULTY ADJUSTMENT
   // Level 1: 24 tiles (8 matches) - Tutorial
-  // Level 2: 81 tiles (27 matches) - Formerly 108. Reduced for ~5% win rate.
-  let tileCount = level === 1 ? 24 : 81; 
+  // Level 2: 63 tiles (21 matches) - Adjusted for ~10% win rate (was 81).
+  let tileCount = level === 1 ? 24 : 63; 
   while (tileCount % 3 !== 0) tileCount++;
 
-  const numTypes = level === 1 ? 6 : 14;
+  // Reduce types for Level 2 from 14 to 10 to increase match probability
+  const numTypes = level === 1 ? 6 : 10;
   const activeIcons = iconKeys.slice(0, numTypes); 
   
   const setsNeeded = tileCount / 3;
@@ -113,18 +114,18 @@ export const generateLevel = (level: number): TileData[] => {
     // 3: The Ring (Circular hole in middle)
     // 4: The Chaos (Wide spread random)
 
-    const layers = 12; // Reduced from 18 to make it less deep/punishing
+    const layers = 10; // Reduced from 12
 
     for (let z = 0; z < layers; z++) {
       if (poolIndex >= pool.length) break;
 
       // Density Calculation:
       // Base layers are wide, Top layers are narrow.
-      // Curve: high -> low
-      let density = Math.max(2, Math.floor(12 - z * 0.8));
+      // Modified density for 63 tiles to ensure reasonable stack height
+      let density = Math.max(3, Math.floor(10 - z * 0.8));
       
       // Override density for specific patterns if needed
-      if (layoutType === 4) density = 8; // Constant scatter
+      if (layoutType === 4) density = 6; // Constant scatter
 
       for (let i = 0; i < density; i++) {
         if (poolIndex >= pool.length) break;

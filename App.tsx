@@ -27,7 +27,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleResize = () => {
        const headerHeight = 70;
-       const footerHeight = 200; 
+       // Increased footer height reservation to ensure more gap on small screens
+       const footerHeight = 220; 
        const safetyMargin = 20;
        // Use standard innerHeight, handled by 100dvh in CSS for container
        const availableHeight = window.innerHeight - headerHeight - footerHeight - safetyMargin;
@@ -186,7 +187,7 @@ const App: React.FC = () => {
        const maxZ = prev.length > 0 ? Math.max(...prev.map(t => t.z)) : 10;
        
        // Calculate position for removed tiles
-       // Place them at the bottom of the board area (y=9.2) to appear just above controls
+       // Place them at the bottom of the board area (y=8.0) to appear just above controls
        // Use powerUps.remove count to alternate sides to prevent overlap:
        // 2 charges left (1st use) -> Left side (0.5 start)
        // 1 charge left (2nd use) -> Right side (3.5 start)
@@ -196,7 +197,7 @@ const App: React.FC = () => {
          ...t, 
          z: maxZ + 10 + i, // High Z to be on top
          x: startX + i, 
-         y: 9.2, // Move slightly lower to visually sit above the footer
+         y: 8.0, // Move to 8.0 to ensure clearance from footer buttons on mobile
          id: t.id + '_returned'
        }));
        
@@ -313,7 +314,7 @@ const App: React.FC = () => {
                 <div className="bg-gray-100 rounded-lg p-3 mb-6 w-full text-center">
                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Mission</p>
                    <p className="text-gray-800 font-medium text-sm">消除所有Token，避免爆仓</p>
-                   <p className="text-red-500 text-xs mt-1 font-bold">通关率 &lt; 0.1%</p>
+                   <p className="text-red-500 text-xs mt-1 font-bold">通关率 ~10%</p>
                 </div>
                 <button 
                   onClick={() => startGame(1)}
