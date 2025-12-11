@@ -3,14 +3,12 @@ class AudioService {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
   private isBgmPlaying: boolean = true;
-  private bgmAudio: HTMLAudioElement;
+  private bgmAudio: HTMLAudioElement | null = null;
   private nextNoteTime: number = 0;
   private timerID: number | null = null;
   private noteIndex: number = 0;
 
   // Funny "Marimba" Melody Sequence (64 steps)
-  // 0 represents a rest
-  // Frequencies approx: C4=261, D4=293, E4=329, F4=349, G4=392, A4=440, B4=493, C5=523
   private melodyPattern: number[] = [
     // Bar 1
     261.63, 0, 329.63, 392.00, 440.00, 392.00, 329.63, 261.63, 
@@ -27,38 +25,47 @@ class AudioService {
   ];
 
   constructor() {
+    // DO NOT initialize AudioContext here.
+    // It causes crashes in strict browsers if done without user gesture.
+  }
+
+  // Called ONCE on the first user interaction (Start Game)
+  public initialize() {
+    if (this.ctx) return; // Already initialized
+
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
       }
     } catch (e) {
-      console.error("Web Audio API not supported");
+      console.error("Web Audio API not supported or blocked", e);
     }
 
-    // Try to load external BGM first
-    this.bgmAudio = new Audio();
-    this.bgmAudio.src = 'bgm.mp3'; 
-    this.bgmAudio.loop = true;
-    this.bgmAudio.volume = 0.5;
-    
-    this.bgmAudio.onerror = () => {
-      console.log("BGM file not found, switching to procedural funny beat.");
-    };
+    // Setup BGM Audio Element
+    if (!this.bgmAudio) {
+      this.bgmAudio = new Audio();
+      this.bgmAudio.src = 'bgm.mp3'; 
+      this.bgmAudio.loop = true;
+      this.bgmAudio.volume = 0.5;
+      
+      this.bgmAudio.onerror = () => {
+        console.log("BGM file not found, switching to procedural funny beat.");
+      };
+    }
   }
 
   private initCtx() {
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(e => console.warn("Audio resume failed", e));
     }
+    // Double check initialization if not done yet
     if (!this.ctx) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) this.ctx = new AudioContextClass();
+       this.initialize();
     }
   }
 
   // --- Procedural Funny Music Generator ---
-  // Style: "Marimba/Woodblock" (Organic, not electronic buzzing)
   private scheduleNote(stepIndex: number, time: number) {
     if (!this.ctx || this.isMuted || !this.isBgmPlaying) return;
 
@@ -72,29 +79,25 @@ class AudioService {
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       
-      // Sine wave sounds like a pure wood hit or bell
       osc.type = 'sine'; 
       osc.frequency.setValueAtTime(noteFreq, time);
       
-      // Envelope: Fast attack, quick decay (Percussive)
       gain.gain.setValueAtTime(0, time);
       gain.gain.linearRampToValueAtTime(0.3, time + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3); // Short "bonk" sound
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3); 
       
       osc.start(time);
       osc.stop(time + 0.35);
     }
 
-    // 2. Bass/Rhythm Voice (Soft walking bass)
-    // Play on every 2nd step (quarter notes if steps are 8th notes)
+    // 2. Bass/Rhythm Voice
     if (stepIndex % 2 === 0) {
       const oscBass = this.ctx.createOscillator();
       const gainBass = this.ctx.createGain();
       oscBass.connect(gainBass);
       gainBass.connect(this.ctx.destination);
       
-      oscBass.type = 'triangle'; // Softer than square
-      // Simple alternating bass: C3 (130Hz) and G2 (98Hz)
+      oscBass.type = 'triangle';
       const bassFreq = (Math.floor(stepIndex / 4) % 2 === 0) ? 130.8 : 98.0; 
       
       oscBass.frequency.setValueAtTime(bassFreq, time);
@@ -109,8 +112,6 @@ class AudioService {
   }
 
   private scheduler() {
-    // 150ms per step ~= 100 BPM for 1/16th notes or 200 BPM for 1/8th notes.
-    // Let's aim for a "walking" tempo.
     const secondsPerStep = 0.16; 
     const lookahead = 0.1; 
 
@@ -129,15 +130,14 @@ class AudioService {
   // --- Controls ---
 
   startBGM() {
-    if (this.isMuted || !this.isBgmPlaying) return;
+    this.initCtx(); // Ensure context is ready
+    if (this.isMuted || !this.isBgmPlaying || !this.bgmAudio) return;
 
-    // Try HTML5 Audio first
     const playPromise = this.bgmAudio.play();
     
     if (playPromise !== undefined) {
       playPromise.catch(error => {
         // Fallback to procedural
-        this.initCtx();
         if (this.ctx && !this.timerID) {
           this.nextNoteTime = this.ctx.currentTime + 0.1;
           this.scheduler();
@@ -147,8 +147,10 @@ class AudioService {
   }
 
   stopBGM() {
-    this.bgmAudio.pause();
-    this.bgmAudio.currentTime = 0; 
+    if (this.bgmAudio) {
+        this.bgmAudio.pause();
+        this.bgmAudio.currentTime = 0; 
+    }
     if (this.timerID) {
       clearTimeout(this.timerID);
       this.timerID = null;
@@ -158,14 +160,12 @@ class AudioService {
   toggleMute() {
     this.isMuted = !this.isMuted;
     if (this.isMuted) {
-      // Stop everything
-      this.bgmAudio.pause();
+      if (this.bgmAudio) this.bgmAudio.pause();
       if (this.timerID) {
         clearTimeout(this.timerID);
         this.timerID = null;
       }
     } else {
-      // Resume if valid
       if (this.isBgmPlaying) this.startBGM();
     }
     return this.isMuted;
@@ -175,22 +175,21 @@ class AudioService {
     this.isBgmPlaying = !this.isBgmPlaying;
     
     if (this.isBgmPlaying) {
-      // Turned ON
       if (!this.isMuted) this.startBGM();
     } else {
-      // Turned OFF
       this.stopBGM();
     }
     return this.isBgmPlaying;
   }
 
-  // --- SFX (Woodblock / Pop style to match music) ---
+  // --- SFX ---
   playClick() {
-    if (this.isMuted || !this.ctx) return;
-    this.initCtx();
+    if (this.isMuted) return;
+    this.initCtx(); // Try to init if not yet
+    if (!this.ctx) return;
+
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    // High pitch woodblock
     osc.type = 'sine';
     osc.frequency.setValueAtTime(800, this.ctx.currentTime);
     gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
@@ -202,14 +201,15 @@ class AudioService {
   }
 
   playMatch() {
-    if (this.isMuted || !this.ctx) return;
+    if (this.isMuted) return;
     this.initCtx();
+    if (!this.ctx) return;
+
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    // Magic chime
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
-    osc.frequency.linearRampToValueAtTime(1046.50, this.ctx.currentTime + 0.1); // C6
+    osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(1046.50, this.ctx.currentTime + 0.1);
     gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
     osc.connect(gain);
@@ -219,11 +219,12 @@ class AudioService {
   }
 
   playError() {
-    if (this.isMuted || !this.ctx) return;
+    if (this.isMuted) return;
     this.initCtx();
+    if (!this.ctx) return;
+
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    // Low thud
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(100, this.ctx.currentTime);
     osc.frequency.linearRampToValueAtTime(50, this.ctx.currentTime + 0.2);
@@ -236,15 +237,15 @@ class AudioService {
   }
 
   playWin() {
-    if (this.isMuted || !this.ctx) return;
+    if (this.isMuted) return;
     this.initCtx();
+    if (!this.ctx) return;
+
     const now = this.ctx.currentTime;
-    // Major triad arpeggio
     [0, 0.15, 0.3].forEach((delay, i) => {
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
       osc.type = 'sine';
-      // C, E, G
       const freqs = [523.25, 659.25, 783.99]; 
       osc.frequency.setValueAtTime(freqs[i], now + delay);
       gain.gain.setValueAtTime(0.3, now + delay);

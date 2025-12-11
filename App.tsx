@@ -27,12 +27,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleResize = () => {
        const headerHeight = 70;
-       const footerHeight = 200; // Increased safety margin for footer
+       const footerHeight = 200; 
        const safetyMargin = 20;
+       // Use standard innerHeight, handled by 100dvh in CSS for container
        const availableHeight = window.innerHeight - headerHeight - footerHeight - safetyMargin;
        const baseBoardHeight = 520; 
        
-       // Calculate scale to fit. Min scale 0.55
        const scale = Math.min(1, Math.max(0.55, availableHeight / baseBoardHeight));
        setBoardScale(scale);
     };
@@ -44,12 +44,12 @@ const App: React.FC = () => {
 
   // Background Music Control
   useEffect(() => {
+    // Only play if actively playing (game started)
     if (gameState === 'playing' && !isMuted && isBgmOn) {
        audio.startBGM();
     } else {
        audio.stopBGM();
     }
-    // Cleanup not strictly needed as audio service handles state, but good practice
   }, [gameState, isMuted, isBgmOn]);
 
   const triggerWinEffect = () => {
@@ -57,6 +57,9 @@ const App: React.FC = () => {
   };
 
   const startGame = (startLevel: number = 1) => {
+    // CRITICAL: Initialize Audio Context on FIRST user interaction (Click)
+    audio.initialize(); 
+
     setLevel(startLevel);
     const newTiles = generateLevel(startLevel);
     setBoardTiles(newTiles);
@@ -116,7 +119,7 @@ const App: React.FC = () => {
     // 2. Check Loss
     if (dockTiles.length >= DOCK_CAPACITY) {
        const timer = setTimeout(() => {
-          // Double check match again inside timeout to be safe
+          // Double check match again inside timeout
           const currentCounts: Record<string, number> = {};
           dockTiles.forEach(t => { currentCounts[t.type] = (currentCounts[t.type] || 0) + 1; });
           if (!Object.values(currentCounts).some(c => c >= 3)) {
@@ -180,12 +183,11 @@ const App: React.FC = () => {
     setDockTiles(prev => prev.slice(3));
     
     setBoardTiles(prev => {
-       // Find max Z to place returned tiles on TOP
        const maxZ = prev.length > 0 ? Math.max(...prev.map(t => t.z)) : 10;
        
        const newTiles = toRemove.map((t, i) => ({
          ...t, 
-         z: maxZ + 1 + i, // Ensure it's on top of everything
+         z: maxZ + 1 + i, 
          x: Math.floor(Math.random() * 7), 
          y: Math.floor(Math.random() * 8), 
          id: t.id + '_returned'
@@ -215,7 +217,6 @@ const App: React.FC = () => {
     const percentage = Math.floor((cleared / total) * 100);
     const timeSpent = Math.floor((endTime - startTime) / 1000);
     
-    // Rank titles
     let rank = "韭菜 (Leek)";
     if (percentage > 20) rank = "小白 (Newbie)";
     if (percentage > 50) rank = "散户 (Trader)";
@@ -225,14 +226,14 @@ const App: React.FC = () => {
     return { percentage, timeSpent, rank };
   };
 
-  const stats = useMemo(() => getScoreStats(), [gameState, endTime]); // Recalc only on game end
+  const stats = useMemo(() => getScoreStats(), [gameState, endTime]);
 
+  // Use 100dvh for better mobile browser support
   return (
-    <div className={`relative w-full h-full flex flex-col items-center overflow-hidden font-sans ${isShaking ? 'animate-shake' : ''}`}>
+    <div className={`relative w-full flex flex-col items-center overflow-hidden font-sans ${isShaking ? 'animate-shake' : ''}`} style={{ height: '100dvh' }}>
       
       {/* Background */}
       <div className="absolute inset-0 z-0 bg-[#e0f7fa]">
-          {/* Main SVG Background */}
           <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
@@ -270,11 +271,9 @@ const App: React.FC = () => {
              </div>
          </div>
          <div className="flex gap-2">
-            {/* BGM Toggle */}
             <button onClick={toggleBGM} className={`w-12 h-12 backdrop-blur rounded-full shadow-lg border-2 border-[#38f9d7] flex items-center justify-center text-xl hover:scale-110 transition active:scale-95 ${isBgmOn ? 'bg-white/90 text-blue-500' : 'bg-gray-200 text-gray-400'}`}>
                  {isBgmOn ? '🎵' : '🚫'}
             </button>
-            {/* SFX Mute */}
             <button onClick={toggleMute} className={`w-12 h-12 backdrop-blur rounded-full shadow-lg border-2 border-[#38f9d7] flex items-center justify-center text-xl hover:scale-110 transition active:scale-95 ${!isMuted ? 'bg-white/90 text-green-600' : 'bg-gray-200 text-gray-400'}`}>
                  {isMuted ? '🔕' : '🔊'}
             </button>
@@ -284,7 +283,6 @@ const App: React.FC = () => {
       {/* Main Game Area - Flexible Height, Shrinkable */}
       <main className="flex-1 w-full min-h-0 relative max-w-lg mx-auto flex flex-col justify-center items-center overflow-visible z-10">
         {gameState === 'playing' && (
-          // Dynamic scaling container
           <div 
              className="relative w-full h-[520px] transition-transform origin-center duration-300 ease-out"
              style={{ transform: `scale(${boardScale})` }}
