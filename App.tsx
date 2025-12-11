@@ -69,7 +69,7 @@ const App: React.FC = () => {
     
     // Give more powerups for level 2
     if (startLevel === 2) {
-      setPowerUps({ undo: 1, remove: 1, shuffle: 1 });
+      setPowerUps({ undo: 2, remove: 2, shuffle: 2 });
     } else {
       setPowerUps({ undo: 0, remove: 0, shuffle: 0 }); // Tutorial is too easy for tools
     }
@@ -185,13 +185,21 @@ const App: React.FC = () => {
     setBoardTiles(prev => {
        const maxZ = prev.length > 0 ? Math.max(...prev.map(t => t.z)) : 10;
        
+       // Calculate position for removed tiles
+       // Place them at the bottom of the board area (y=9.2) to appear just above controls
+       // Use powerUps.remove count to alternate sides to prevent overlap:
+       // 2 charges left (1st use) -> Left side (0.5 start)
+       // 1 charge left (2nd use) -> Right side (3.5 start)
+       const startX = (powerUps.remove % 2 === 0) ? 0.5 : 3.5;
+
        const newTiles = toRemove.map((t, i) => ({
          ...t, 
-         z: maxZ + 1 + i, 
-         x: Math.floor(Math.random() * 7), 
-         y: Math.floor(Math.random() * 8), 
+         z: maxZ + 10 + i, // High Z to be on top
+         x: startX + i, 
+         y: 9.2, // Move slightly lower to visually sit above the footer
          id: t.id + '_returned'
        }));
+       
        return checkInteractability([...prev, ...newTiles]);
     });
     
